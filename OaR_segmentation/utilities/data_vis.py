@@ -87,10 +87,10 @@ def plot_results(results, paths, labels, used_net, met='all', mode=""):
         plot_single_result(results=results, type=m, paths=paths, labels=labels, mode=mode, used_net=used_net)
 
 
-def visualize(image, mask, original_image=None, original_mask=None):
+def visualize(image, mask, file_name=None, additional_1=None, additional_2=None ):
     fontsize = 18
 
-    if original_image is None and original_mask is None:
+    if additional_1 is None and additional_2 is None:
         f, ax = plt.subplots(2, 1, figsize=(8, 8))
 
         ax[0].imshow(image)
@@ -98,20 +98,21 @@ def visualize(image, mask, original_image=None, original_mask=None):
     else:
         f, ax = plt.subplots(2, 2, figsize=(8, 8))
 
-        ax[0, 0].imshow(original_image)
-        ax[0, 0].set_title('Original image', fontsize=fontsize)
+        ax[0, 0].imshow(image)
+        ax[0, 0].set_title('Image', fontsize=fontsize)
 
-        ax[1, 0].imshow(original_mask)
-        ax[1, 0].set_title('Original mask', fontsize=fontsize)
+        ax[1, 0].imshow(mask)
+        ax[1, 0].set_title('Mask', fontsize=fontsize)
 
-        ax[0, 1].imshow(image)
-        ax[0, 1].set_title('Transformed image', fontsize=fontsize)
+        ax[0, 1].imshow(additional_1)
+        ax[0, 1].set_title('Additional 1', fontsize=fontsize)
 
-        ax[1, 1].imshow(mask)
-        ax[1, 1].set_title('Transformed mask', fontsize=fontsize)
+        ax[1, 1].imshow(additional_2)
+        ax[1, 1].set_title('Additional 2', fontsize=fontsize)
 
     plt.show()
-    plt.savefig(str(random.randint(1, 1000)))
+    if file_name is not None:
+        plt.savefig(f"temp_img/{file_name}")
 
 def visualize_test(dict_images:dict, info:list=False):
     fontsize = 18
@@ -128,7 +129,7 @@ def visualize_test(dict_images:dict, info:list=False):
     #     temp+= " " + str(str_t)
     # plt.figtext(0.5, 0.01, temp, ha="center", fontsize=18, bbox={"facecolor": "orange", "alpha": 0.5, "pad": 5})
     plt.show()
-    plt.savefig(str(random.randint(1, 1000)))
+    #plt.savefig(str(random.randint(1, 1000)))
 
 
 

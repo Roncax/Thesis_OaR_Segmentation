@@ -1,18 +1,20 @@
 import sys
 
-sys.path.append(r'/home/roncax/Git/Pytorch-UNet/') # /content/gdrive/MyDrive/Colab/Thesis_OaR_Segmentation/
+# /content/gdrive/MyDrive/Colab/Thesis_OaR_Segmentation/
+sys.path.append(r'/home/roncax/Git/Pytorch-UNet/')
 
+from OaR_segmentation.utilities.paths import Paths
+from OaR_segmentation.training.custom_trainer import CustomTrainer
+from OaR_segmentation.network_architecture.net_factory import build_net
 import argparse
 
-from OaR_segmentation.network_architecture.net_factory import build_net
-from OaR_segmentation.training.custom_trainer import CustomTrainer
-from OaR_segmentation.utilities.paths import Paths
 
 
 def run_training():
-    
+
     model = "unet"  # args.network   #seresunet, unet, segnet, deeplabv3
-    db_name = "SegTHOR"  # args.db  #SegTHOR, StructSeg2019_Task3_Thoracic_OAR
+    # args.db  #SegTHOR, StructSeg2019_Task3_Thoracic_OAR
+    db_name = "StructSeg2019_Task3_Thoracic_OAR"
     epochs = 1000  # args.epochs
     batch_size = 1  # args.batch_size
     lr = 0.0001  # args.learning_rate
@@ -22,40 +24,44 @@ def run_training():
     feature_extraction = False  # args.feature_extraction
     augmentation = True  # args.augmentation
     train_type = 'fine'  # args.train_type
-    deep_supervision = False  # args.deep_supervision #only unet and seresunet
-    dropout = False  # args.dropout #deeplav3 builded in, unet and seresunet only (segnet not supported)
+    deep_supervision = True  # args.deep_supervision #only unet and seresunet
+    # args.dropout #deeplav3 builded in, unet and seresunet only (segnet not supported)
+    dropout = True
     scale = 1  # args.scale
-    channels = 1 #used for multi-channel 3d method (forse problemi con deeplab)
+    # used for multi-channel 3d method (forse problemi con deeplab)
+    channels = 1
     multi_loss_weights = [1, 1]  # for composite losses
     deeplabv3_backbone = "mobilenet"  # resnet, drn, mobilenet, xception
-    platform = "local" #local, colab, polimi
+    platform = "local"  # local, colab, polimi
 
     old_classes = 7  # args.old_classes
     paths = Paths(db=db_name, platform=platform)
 
     labels = {
         "0": "Bg",
-        "2": "Heart",
-        "4": "Aorta",
-        "3": "Trachea",
-        "1": "Esophagus"
-              }  # dict_db_parameters["labels"]
+        "1": "RightLung",
+       "2": "LeftLung",
+        "3": "Heart",
+        "4": "Trachea",
+        "5": "Esophagus",
+        "6": "SpinalCord"
+    }  # dict_db_parameters["labels"]
 
-        #SegThor
-        # "0": "Bg",
-        # "2": "Heart",
-        # "4": "Aorta",
-        # "3": "Trachea",
-        # "1": "Esophagus"
+    # SegThor
+    # "0": "Bg",
+    # "2": "Heart",
+    # "4": "Aorta",
+    # "3": "Trachea",
+    # "1": "Esophagus"
 
-        #Structseg
-        # "0": "Bg",
-        # "1": "RightLung",
-        # "2": "LeftLung",
-        # "3": "Heart",
-        # "4": "Trachea",
-        # "5": "Esophagus",
-        # "6": "SpinalCord"
+    # Structseg
+    # "0": "Bg",
+    # "1": "RightLung",
+    # "2": "LeftLung",
+    # "3": "Heart",
+    # "4": "Trachea",
+    # "5": "Esophagus",
+    # "6": "SpinalCord"
 
     n_classes = len(labels) if len(labels) > 2 else 1
 
@@ -71,16 +77,20 @@ def run_training():
 
     # dice, bce, binaryFocal, multiclassFocal, crossentropy, dc_bce
     loss_criteria = {
-                    "0": "bce",
-                    "2": "bce",
-                    "4": "bce",
-                    "3": "bce",
-                    "1": "bce",
-                     "coarse": "crossentropy"
-                     }
+        "0": "bce",
+        "1": "bce",
+        "2": "bce",
+        "3": "bce",
+        "4": "bce",
+        "5": "bce",
+        "6": "bce",
+        "coarse": "crossentropy"
+    }
 
-    assert not (feature_extraction and fine_tuning), "Finetuning and feature extraction cannot be both active"
-    if feature_extraction or fine_tuning: assert old_classes > 0, "Old classes needed to be specified"
+    assert not (
+        feature_extraction and fine_tuning), "Finetuning and feature extraction cannot be both active"
+    if feature_extraction or fine_tuning:
+        assert old_classes > 0, "Old classes needed to be specified"
 
     if train_type == "coarse":
         paths.set_pretrained_model(load_dir_list["coarse"])
@@ -89,12 +99,13 @@ def run_training():
                         channels=channels, old_classes=old_classes, feature_extraction=feature_extraction,
                         dropout=dropout, deep_supervision=deep_supervision, backbone=deeplabv3_backbone)
 
-        trainer = CustomTrainer( paths=paths, image_scale=scale, augmentation=augmentation,
-                                batch_size=batch_size, loss_criterion=loss_criteria['coarse'], val_percent=val,
+        trainer = CustomTrainer(paths=paths, image_scale=scale, augmentation=augmentation,
+                                batch_size=batch_size, loss_criterion=loss_criteria[
+                                    'coarse'], val_percent=val,
                                 labels=labels, network=net, deep_supervision=deep_supervision, dropout=dropout,
                                 fine_tuning=fine_tuning, feature_extraction=feature_extraction,
                                 pretrained_model=load_dir_list["coarse"], lr=lr, patience=patience, epochs=epochs,
-                                multi_loss_weights=multi_loss_weights, platform=platform)
+                                multi_loss_weights=multi_loss_weights, platform=platform, dataset_name=db_name)
 
         trainer.initialize()
         trainer.run_training()
@@ -112,12 +123,13 @@ def run_training():
                             dropout=dropout, deep_supervision=deep_supervision, backbone=deeplabv3_backbone)
             print(net.n_classes)
 
-            trainer = CustomTrainer( paths=paths, image_scale=scale, augmentation=augmentation,
-                                    batch_size=batch_size, loss_criterion=loss_criteria[label], val_percent=val,
+            trainer = CustomTrainer(paths=paths, image_scale=scale, augmentation=augmentation,
+                                    batch_size=batch_size, loss_criterion=loss_criteria[
+                                        label], val_percent=val,
                                     labels=label_dict, network=net, deep_supervision=deep_supervision, dropout=dropout,
                                     fine_tuning=fine_tuning, feature_extraction=feature_extraction,
                                     pretrained_model=load_dir_list[label], lr=lr, patience=patience, epochs=epochs,
-                                    multi_loss_weights=multi_loss_weights, platform=platform)
+                                    multi_loss_weights=multi_loss_weights, platform=platform, dataset_name=db_name)
 
             trainer.initialize()
             trainer.run_training()
@@ -126,8 +138,10 @@ def run_training():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--network", help="seresunet, unet, segnet, deeplabv3", required=False)
-    parser.add_argument("--database_name", "-db", help="Supports: StructSeg2019_Task3_Thoracic_OAR, ...", required=False)
+    parser.add_argument(
+        "--network", help="seresunet, unet, segnet, deeplabv3", required=False)
+    parser.add_argument("--database_name", "-db",
+                        help="Supports: StructSeg2019_Task3_Thoracic_OAR, ...", required=False)
     parser.add_argument("--deterministic", "-det",
                         help="Makes training deterministic, but reduces training speed substantially. "
                              "Deterministic training will make you overfit to some random seed. "
@@ -135,8 +149,10 @@ if __name__ == '__main__':
                         required=False, default=False)
     parser.add_argument("--epochs", "-e", required=False, default=1000)
     parser.add_argument("--batch_size", "-bs", required=False, default=1)
-    parser.add_argument("--learning_rate", "-lr", required=False, default=0.0001)
-    parser.add_argument("--scale", help="Downscaling factor of the images", required=False, default=1)
+    parser.add_argument("--learning_rate", "-lr",
+                        required=False, default=0.0001)
+    parser.add_argument(
+        "--scale", help="Downscaling factor of the images", required=False, default=1)
     parser.add_argument("--validation_size", "-val", help="% of the database that is used as validation (0-1)",
                         required=False, default=0.2)
     parser.add_argument("--patience",
@@ -149,7 +165,8 @@ if __name__ == '__main__':
                         required=False, default=False)
     parser.add_argument("--verbose", "-v", required=False, default=True)
     parser.add_argument("--augmentation", "-aug", required=False, default=True)
-    parser.add_argument("--train_type", required=False, default="multiclass", help="multibinary or multiclass")
+    parser.add_argument("--train_type", required=False,
+                        default="multiclass", help="multibinary or multiclass")
     parser.add_argument("--deep_supervision", required=False, default=False)
     parser.add_argument("--dropout", required=False, default=False)
     parser.add_argument("--old_classes", required=False, default=0, help="Needed only if fine_tuning or "

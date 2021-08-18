@@ -83,14 +83,14 @@ class stack_UNet(nn.Module):
         self.n_channels = n_channels
         self.n_classes = n_classes
         self.bilinear = bilinear
-        self.name = "Unet"
+        self.name = "Stack_Unet"
 
         self.inc = DoubleConv(n_channels, 64)
         factor = 2 if bilinear else 1
 
         self.down1 = Down(64, 128)
-        self.down2 = Down(128, 256// factor)
-        self.down3 = Down(256, 512// factor)
+        self.down2 = Down(128, 256)
+        self.down3 = Down(256, 512)
         self.down4 = Down(512, 1024 // factor)
         self.up1 = Up(1024, 512 // factor, bilinear)
         self.up2 = Up(512, 256 // factor, bilinear)
@@ -107,20 +107,20 @@ class stack_UNet(nn.Module):
         x1 = self.inc(x)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
-        # x4 = self.down3(x3)
-        # x5 = self.down4(x4)
-        # x44 = self.up1(x5, x4)
-        # x33 = self.up2(x44, x3)
-        x22 = self.up3(x3, x2)
+        x4 = self.down3(x3)
+        x5 = self.down4(x4)
+        x44 = self.up1(x5, x4)
+        x33 = self.up2(x44, x3)
+        x22 = self.up3(x33, x2)
         x11 = self.up4(x22, x1)
         x0 = self.outc(x11)
 
         if self.deep_supervision:
             x11 = F.interpolate(self.dsoutc1(x11), x0.shape[2:], mode='bilinear')
-            # x22 = F.interpolate(self.dsoutc2(x22), x0.shape[2:], mode='bilinear')
-            # x33 = F.interpolate(self.dsoutc3(x33), x0.shape[2:], mode='bilinear')
-            # x44 = F.interpolate(self.dsoutc4(x44), x0.shape[2:], mode='bilinear')
-            return x0, x11
+            x22 = F.interpolate(self.dsoutc2(x22), x0.shape[2:], mode='bilinear')
+            x33 = F.interpolate(self.dsoutc3(x33), x0.shape[2:], mode='bilinear')
+            x44 = F.interpolate(self.dsoutc4(x44), x0.shape[2:], mode='bilinear')
+            return x0, x11, x22, x33, x44
         else:
             return x0
 
@@ -147,8 +147,7 @@ def build_stack_unet(channels, n_classes, finetuning, load_dir, device, feature_
         net.load_state_dict(ckpt['state_dict'])
 
     else:
-        net = stack_UNet(n_channels=channels, n_classes=n_classes, bilinear=True,
-                   deep_supervision=deep_supervision).cuda()
+        net = stack_UNet(n_channels=channels, n_classes=n_classes, bilinear=True, deep_supervision=deep_supervision).cuda()
 
     net.n_classes = n_classes
 

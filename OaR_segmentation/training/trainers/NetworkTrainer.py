@@ -1,3 +1,5 @@
+from OaR_segmentation.stacking.stacking_prediction import combine_predictions
+from OaR_segmentation.utilities.data_vis import visualize, visualize_test
 from _warnings import warn
 
 import matplotlib
@@ -500,11 +502,12 @@ class NetworkTrainer(object):
         if self.fp16:
             with autocast():
                 output = self.network(data)
+                
+                data_t = data.clone().detach().squeeze().cpu().numpy()
+                
 
                 del data
                 l = self.loss(output, target)
-
-
 
             if do_backprop:
                 self.amp_grad_scaler.scale(l).backward()
@@ -514,7 +517,7 @@ class NetworkTrainer(object):
             output = self.network(data)
             del data
             l = self.loss(output, target)
-
+            
             if do_backprop:
                 l.backward()
                 nn.utils.clip_grad_value_(self.network.parameters(), 0.1)
@@ -522,6 +525,13 @@ class NetworkTrainer(object):
 
         if run_online_evaluation:
             self.run_online_evaluation(output, target)
+        
+        # out_t = output.clone().detach().squeeze().cpu().numpy()
+        # out_t = combine_predictions(full_output_mask=out_t, mask_threshold=0.5, shape=(512,512)) 
+        # target_t = target.clone().detach().squeeze().cpu().numpy() * 7/255
+        
+        # visualize(image=data_t[4, :, :], mask=out_t, additional_1= target_t, additional_2=target_t,file_name="x")
+        #visualize(image=out_t, mask=target_t)
 
         del target
 

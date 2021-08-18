@@ -1,4 +1,4 @@
-from OaR_segmentation.utilities.data_vis import visualize
+from OaR_segmentation.utilities.data_vis import visualize, visualize_test
 import h5py
 import numpy
 import numpy as np
@@ -10,11 +10,10 @@ from OaR_segmentation.preprocessing.prepare_augment_dataset import *
 
 
 class HDF5Dataset(Dataset):
-    def __init__(self, scale: float, db_info: dict, mode: str, paths, labels: dict,  channels, augmentation=False, stacking=False):
+    def __init__(self, scale: float, db_info: dict, mode: str, hdf5_db_dir: str, labels: dict,  channels, augmentation=False):
         self.db_info = db_info
-        self.stacking = stacking
         self.labels = labels
-        self.db_dir = paths.hdf5_db
+        self.db_dir = hdf5_db_dir
         self.scale = scale
         self.mode = mode
         self.augmentation = augmentation
@@ -24,6 +23,8 @@ class HDF5Dataset(Dataset):
 
         self.ids_img = []
         self.ids_mask = []
+        
+        if mode == "stacking": mode="train" #only the local variable change, the class still see "stacking"
         db = h5py.File(self.db_dir, 'r')
         # upload data from the hdf5 sctructure
         for volumes in db[f'{self.db_info["name"]}/{mode}'].keys():
@@ -50,7 +51,7 @@ class HDF5Dataset(Dataset):
         assert len(self.ids_img) == len(
             self.ids_mask), f"Error in the number of mask {len(self.ids_mask)} and images{len(self.ids_img)}"
 
-        logging.info(f'Creating {mode} dataset with {len(self.ids_img)} images')
+        logging.info(f'Creating {self.mode} dataset with {len(self.ids_img)} images')
 
     def __len__(self):
         return len(self.ids_img)
@@ -95,6 +96,7 @@ class HDF5Dataset(Dataset):
             img = np.uint8(img)
             img, mask = prepare_segmentation_img_mask(img=img, mask=mask, scale=self.scale,
                                                       augmentation=self.augmentation)
+            #visualize(image=img.squeeze(), mask=mask.squeeze())
 
 
 
@@ -140,7 +142,7 @@ class HDF5Dataset(Dataset):
             }
 
         # binary mask + multiclass mask and img
-        elif self.mode == "test" and not self.stacking:
+        elif self.mode == "test":
             img_dict = {}
 
             for lab in self.labels:
@@ -176,26 +178,39 @@ class HDF5Dataset(Dataset):
             }
             
         #! Attenzione scale non implementato ancora
-        elif self.mode == "test" and self.stacking:
+        elif self.mode == "stacking":
             mask_dict = {}
+            img_dict = {}
+
 
             l = [x for x in self.labels.keys() if x != str(0)]
  
             mask_gt = np.zeros(shape=mask.shape, dtype=int)
             for key in l:
+                img_temp = img.copy()
+                img_temp = setDicomWinWidthWinCenter(img_data=img_temp,
+                                                     winwidth=self.db_info["CTwindow_width"][self.labels[key]],
+                                                     wincenter=self.db_info["CTwindow_level"][self.labels[key]])
+                img_temp = np.uint8(img_temp)
+
+                # img_temp = prepare_img(img_temp, self.scale)
+                img_temp = prepare_segmentation_inference_single(img=img_temp, scale=self.scale)
+
+                img_temp = torch.from_numpy(img_temp).type(torch.FloatTensor)
+                img_dict[key] = img_temp
                 mask_gt[mask == int(key)] = key
-                temp_mask = np.zeros(shape=mask.shape, dtype=int)
-                temp_mask[mask == int(key)] = 1
-                temp_mask = prepare_segmentation_mask(mask=temp_mask, scale=self.scale)
-                temp_mask = np.uint8(temp_mask)
-                temp_mask = torch.from_numpy(temp_mask).type(torch.FloatTensor)
-                mask_dict[key] = temp_mask
+                # temp_mask = np.zeros(shape=mask.shape, dtype=int)
+                # temp_mask[mask == int(key)] = 1
+                # temp_mask = prepare_segmentation_mask(mask=temp_mask, scale=self.scale)
+                # temp_mask = np.uint8(temp_mask)
+                # temp_mask = torch.from_numpy(temp_mask).type(torch.FloatTensor)
+                # mask_dict[key] = temp_mask
                 
             mask_gt = prepare_segmentation_mask(mask=mask_gt, scale=self.scale)
             mask_gt = np.uint8(mask_gt)
 
             return {
-                'mask_dict': mask_dict,
+                'img_dict': img_dict,
                 'mask_gt': torch.from_numpy(mask_gt).type(torch.FloatTensor),
                 'id': self.ids_img[idx],
             }

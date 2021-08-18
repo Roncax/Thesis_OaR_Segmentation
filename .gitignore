@@ -8,9 +8,7 @@ __pycache__/
 *.hdf5
 .vscode/
 
-data/SegTHOR/checkpoints/
-data/StructSeg2019_Task3_Thoracic_OAR/checkpoints/
-data/Lung_CT_AAPM_Seg 2017/checkpoints/
 
 
-data/stacking/
+data/checkpoints_stacking/
+data/checkpoints_segmentation/

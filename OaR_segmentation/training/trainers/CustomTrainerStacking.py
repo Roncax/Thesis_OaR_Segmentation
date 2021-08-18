@@ -5,18 +5,18 @@ from torch import optim
 from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
 
-from OaR_segmentation.datasets.hdf5Dataset import HDF5Dataset
+from OaR_segmentation.db_loaders.HDF5DatasetStacking import HDF5Dataset_stacking
 from OaR_segmentation.training.loss_factory import build_loss
-from OaR_segmentation.training.network_trainer import NetworkTrainer
+from OaR_segmentation.training.trainers.NetworkTrainer import NetworkTrainer
 from OaR_segmentation.evaluation import eval
 
 
-class CustomTrainer(NetworkTrainer):
+class CustomTrainerStacking(NetworkTrainer):
     def __init__(self, paths, image_scale, augmentation, batch_size
                  , loss_criterion, val_percent, labels, network, deep_supervision, pretrained_model, dropout,
-                 feature_extraction, fine_tuning, lr, epochs, patience, multi_loss_weights,platform, deterministic=False,
+                 feature_extraction, fine_tuning, lr, epochs, patience, dataset_name, multi_loss_weights,platform, used_output_models, deterministic=False,
                  fp16=True):
-        super(CustomTrainer, self).__init__(deterministic, fp16)
+        super(CustomTrainerStacking, self).__init__(deterministic, fp16)
 
         self.paths = paths
         self.network = network
@@ -27,6 +27,7 @@ class CustomTrainer(NetworkTrainer):
         self.fine_tuning = fine_tuning
         self.max_num_epochs = epochs
         self.patience = patience
+        self.dataset_name = dataset_name
 
         self.output_folder = None
         self.loss_criterion = loss_criterion
@@ -35,6 +36,7 @@ class CustomTrainer(NetworkTrainer):
         self.dataset_directory = paths.dir_database
         self.lr = lr
         self.platform = platform
+        self.used_output_models = used_output_models
 
         self.img_scale = image_scale
         self.labels = labels
@@ -46,15 +48,15 @@ class CustomTrainer(NetworkTrainer):
         self.experiment_number = None
 
     def set_experiment_number(self):
-        dict_db_parameters = json.load(open(self.paths.json_file_database))
+        dict_db_parameters = json.load(open(self.paths.json_stacking_experiments_results))
         dict_db_parameters[f"experiments_{self.platform}"] += 1
         self.experiment_number = dict_db_parameters[f"experiments_{self.platform}"]
-        json.dump(dict_db_parameters, open(self.paths.json_file_database, "w"))
-        self.paths.set_experiment_number(self.experiment_number)
+        json.dump(dict_db_parameters, open(self.paths.json_stacking_experiments_results, "w"))
+        self.paths.set_experiment_stacking_number(self.experiment_number)
         self.output_folder = self.paths.dir_checkpoint
 
     def initialize(self, training=True):
-        super(CustomTrainer, self).initialize(training)
+        super(CustomTrainerStacking, self).initialize(training)
 
         self.class_weights = [int(x) / 100 for x in json.load(open(self.paths.json_file_database))["weights"].values()]
 
@@ -75,6 +77,7 @@ class CustomTrainer(NetworkTrainer):
 
     def initialize_optimizer_and_scheduler(self):
         self.optimizer = optim.RMSprop(self.network.parameters(), lr=self.lr, weight_decay=1e-8, momentum=0.9)
+        #self.optimizer = optim.SGD(self.network.parameters(), lr=self.lr, momentum=0.9)
         self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer=self.optimizer, mode='min', patience=2)
 
     def validate(self, *args, **kwargs):
@@ -87,8 +90,7 @@ class CustomTrainer(NetworkTrainer):
 
     def load_dataset(self):
         # DATASET split train/val
-        self.dataset = HDF5Dataset(scale=self.img_scale, mode='train',
-                                   db_info=json.load(open(self.paths.json_file_database)), paths=self.paths,
+        self.dataset = HDF5Dataset_stacking(scale=self.img_scale, hdf5_db_dir=self.paths.hdf5_stacking,
                                    labels=self.labels, augmentation=self.augmentation, channels=self.network.n_channels)
 
         n_val = int(len(self.dataset) * self.val_percent)
@@ -135,8 +137,10 @@ class CustomTrainer(NetworkTrainer):
     def json_log_save(self):
         temp_dict = {
             self.experiment_number: {
+                "dataset":self.dataset_name,
                 "organ": list(self.labels.values()),
                 "model": self.network.name,
+                "used_output_models": self.used_output_models,
                 "max_num_epochs": self.max_num_epochs,
                 "epoch_results": {},
                 "batch_size": self.batch_size,

@@ -1,23 +1,18 @@
-from operator import gt
-from typing import final
-from numpy.core.fromnumeric import shape
-from numpy.lib.arraysetops import unique
-from OaR_segmentation.utilities.data_vis import visualize, visualize_test
 import h5py
-import numpy
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 import logging
-from OaR_segmentation.preprocessing.ct_levels_enhance import setDicomWinWidthWinCenter
+
+from OaR_segmentation.utilities.data_vis import visualize, visualize_test
 from OaR_segmentation.preprocessing.prepare_augment_dataset import *
 
 
-class HDF5Dataset_stacking(Dataset):
-    def __init__(self, scale: float, paths, labels: dict,  channels, augmentation=False,):
+class HDF5DatasetStacking(Dataset):
+    def __init__(self, scale: float, hdf5_db_dir, labels: dict,  channels, augmentation=False,):
 
         self.labels = labels
-        self.db_dir = paths.hdf5_stacking
+        self.db_dir = hdf5_db_dir
         self.scale = scale
         self.augmentation = augmentation
         self.channels = channels
@@ -38,7 +33,6 @@ class HDF5Dataset_stacking(Dataset):
     def __getitem__(self, idx):
         db = h5py.File(self.db_dir, 'r')
         masks = db[self.ids_mask[idx]]
-        test={}
 
         final_array = None
         for mask_name in masks.keys():
@@ -46,17 +40,17 @@ class HDF5Dataset_stacking(Dataset):
             if mask_name != "gt":
                 
                 t_mask_dict = prepare_segmentation_mask(mask=masks[mask_name], scale=self.scale)
-                test[mask_name]=t_mask_dict.squeeze()
                 if final_array is None:
+                    
+                    
                     final_array = t_mask_dict
                 else:
                     final_array = np.concatenate((t_mask_dict, final_array), axis=0)
             else:
                 temp_mask = prepare_segmentation_mask(mask=masks[mask_name], scale=self.scale)
                 gt_mask = temp_mask
-                test["gt"]=gt_mask.squeeze()
+            
                 
-        #visualize_test(dict_images=test)
         
         return {
                     'image': torch.from_numpy(final_array).type(torch.FloatTensor),

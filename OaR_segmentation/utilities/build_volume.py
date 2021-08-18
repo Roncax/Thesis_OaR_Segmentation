@@ -41,9 +41,3 @@ def mask_to_image1D(mask):
     for i, m in enumerate(mask):
         img[m] = i
     return Image.fromarray(img.astype(np.uint8))
-
-def volume_mask_to_1Darray(mask):
-    img = np.zeros((512, 512))
-    for i, m in enumerate(mask):
-        img[m] = i
-    return img

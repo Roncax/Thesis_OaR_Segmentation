@@ -94,9 +94,6 @@
         "13",
         "23"
     ],
-    "experiments_local": 1044,
-    "experiments_colab": 10000,
-    "experiments_polimi": 20000,
     "train": [
         "14",
         "50",
